@@ -9,28 +9,32 @@ import (
 	"log"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 // Input would contain statistic about a file
 type Input struct {
-	FileName  string
-	Content   string
-	ByteCount int
+	FileName       string
+	Content        string
+	ByteCount      int
+	LineCount      int
+	WordCount      int
+	CharacterCount int
 }
 
 // wcEngine ...
-type wcEngine struct {
+type WcEngine struct {
 	*wcflag.Options
 	Input []Input
 }
 
 // InitEngine ...
-func InitEngine(options *wcflag.Options) wcEngine {
+func InitEngine(options *wcflag.Options) WcEngine {
 
 	// We need to identify command line arguments that are not flags. The working assumption is that flags
 	// will always start with a `-`. If a command line argument doesn't start with the `-` then it isn't a flag
 	inputFiles := handleCommandLineInput(os.Args[1:])
-	return wcEngine{
+	return WcEngine{
 		Options: options,
 		Input:   inputFiles,
 	}
@@ -52,13 +56,13 @@ func handleCommandLineInput(cmdArg []string) []Input {
 		scanner := bufio.NewScanner(bufio.NewReader(os.Stdin))
 		text := ""
 		for scanner.Scan() {
-			text += scanner.Text()
+			text += scanner.Text() + "\n"
 		}
 
 		return []Input{
 			{
 				FileName: stdInF.Name(),
-				Content:  text,
+				Content:  strings.Trim(text, "\n"),
 			},
 		}
 
@@ -95,7 +99,7 @@ func handleCommandLineInput(cmdArg []string) []Input {
 
 		inputList = append(inputList, Input{
 			FileName: arg,
-			Content:  string(content),
+			Content:  strings.Trim(string(content), "\n "),
 		})
 	}
 
@@ -109,12 +113,20 @@ func handleCommandLineInput(cmdArg []string) []Input {
 
 // Count is the main function of wcEngine. It does a count based
 // on the option defined and returns the output to the command line
-func (we *wcEngine) Count() {
+func (we *WcEngine) Count() {
 
 	switch {
+	case *we.Options.CountLines:
+		countLine(we.Input)
 
 	case *we.Options.CountBytes:
 		countByte(we.Input)
+
+	case *we.Options.CountWords:
+		countWord(we.Input)
+
+	case *we.Options.CountCharacters:
+		countCharacter(we.Input)
 
 	default:
 		log.Fatal("Option is not supported!")
@@ -131,25 +143,37 @@ func countByte(input []Input) {
 	}
 }
 
-func countLine(text string) {
-
+func countLine(input []Input) {
+	for i := range input {
+		input[i].LineCount = len(strings.Split(input[i].Content, "\n"))
+	}
 }
 
-func countWord(text string) {
-
+func countWord(input []Input) {
+	for i := range input {
+		input[i].WordCount = len(strings.Split(input[i].Content, " "))
+	}
 }
 
-func (we *wcEngine) printResult() {
+func countCharacter(input []Input) {
+	for i := range input {
+		input[i].CharacterCount = utf8.RuneCount([]byte(input[i].Content))
+	}
+}
+
+func (we *WcEngine) printResult() {
 
 	totalByteCount := 0
+	totalLineCount := 0
 
 	for index := range we.Input {
-		fmt.Printf("%v %s\n", we.Input[index].ByteCount, we.Input[index].FileName)
+		fmt.Printf("%v %v %v %v %s\n", we.Input[index].ByteCount, we.Input[index].LineCount, we.Input[index].WordCount, we.Input[index].CharacterCount, we.Input[index].FileName)
 		totalByteCount += we.Input[index].ByteCount
+		totalLineCount += we.Input[index].LineCount
 	}
 
 	if totalByteCount > we.Input[0].ByteCount {
-		fmt.Printf("%v Total\n", totalByteCount)
+		fmt.Printf("%v %v Total\n", totalByteCount, totalLineCount)
 	}
 
 }
