@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-// Input would contain statistic about a file
+// Input contains statistics about a file
 type Input struct {
 	FileName       string
 	Content        string
@@ -22,7 +22,7 @@ type Input struct {
 	CharacterCount int
 }
 
-// wcEngine ...
+// WcEngine ...
 type WcEngine struct {
 	*wcflag.Options
 	Input []Input
@@ -30,7 +30,6 @@ type WcEngine struct {
 
 // InitEngine ...
 func InitEngine(options *wcflag.Options) WcEngine {
-
 	// We need to identify command line arguments that are not flags. The working assumption is that flags
 	// will always start with a `-`. If a command line argument doesn't start with the `-` then it isn't a flag
 	inputFiles := handleCommandLineInput(os.Args[1:])
@@ -38,12 +37,9 @@ func InitEngine(options *wcflag.Options) WcEngine {
 		Options: options,
 		Input:   inputFiles,
 	}
-
 }
 
-// todo: explain tomorrow
 func handleCommandLineInput(cmdArg []string) []Input {
-
 	// If we are in pipe mode. Handle text from standard input
 	stdInF, err := os.Stdin.Stat()
 	if err != nil {
@@ -52,7 +48,6 @@ func handleCommandLineInput(cmdArg []string) []Input {
 	}
 
 	if stdInF.Mode()&os.ModeCharDevice == 0 { // if true, we are in pipe mode
-
 		scanner := bufio.NewScanner(bufio.NewReader(os.Stdin))
 		text := ""
 		for scanner.Scan() {
@@ -65,14 +60,12 @@ func handleCommandLineInput(cmdArg []string) []Input {
 				Content:  strings.Trim(text, "\n"),
 			},
 		}
-
 	}
 
 	inputList := make([]Input, 0)
 
 	// loop through from the end and store everything that isn't a flag in inputList
 	for i := len(cmdArg) - 1; i >= 0; i-- {
-
 		arg := cmdArg[i]
 		if strings.HasPrefix(arg, "-") {
 			break
@@ -114,66 +107,39 @@ func handleCommandLineInput(cmdArg []string) []Input {
 // Count is the main function of wcEngine. It does a count based
 // on the option defined and returns the output to the command line
 func (we *WcEngine) Count() {
-
-	switch {
-	case *we.Options.CountLines:
-		countLine(we.Input)
-
-	case *we.Options.CountBytes:
-		countByte(we.Input)
-
-	case *we.Options.CountWords:
-		countWord(we.Input)
-
-	case *we.Options.CountCharacters:
-		countCharacter(we.Input)
-
-	default:
-		log.Fatal("Option is not supported!")
+	for i := range we.Input {
+		if *we.Options.CountLines {
+			we.Input[i].LineCount = len(strings.Split(we.Input[i].Content, "\n"))
+		}
+		if *we.Options.CountBytes {
+			we.Input[i].ByteCount = len(we.Input[i].Content)
+		}
+		if *we.Options.CountWords {
+			we.Input[i].WordCount = len(strings.Fields(we.Input[i].Content))
+		}
+		if *we.Options.CountCharacters {
+			we.Input[i].CharacterCount = utf8.RuneCountInString(we.Input[i].Content)
+		}
 	}
 
 	we.printResult()
-
-}
-
-// countByte counts the number byte in a given string
-func countByte(input []Input) {
-	for i := range input {
-		input[i].ByteCount = len(input[i].Content)
-	}
-}
-
-func countLine(input []Input) {
-	for i := range input {
-		input[i].LineCount = len(strings.Split(input[i].Content, "\n"))
-	}
-}
-
-func countWord(input []Input) {
-	for i := range input {
-		input[i].WordCount = len(strings.Split(input[i].Content, " "))
-	}
-}
-
-func countCharacter(input []Input) {
-	for i := range input {
-		input[i].CharacterCount = utf8.RuneCount([]byte(input[i].Content))
-	}
 }
 
 func (we *WcEngine) printResult() {
-
 	totalByteCount := 0
 	totalLineCount := 0
+	totalWordCount := 0
+	totalCharacterCount := 0
 
-	for index := range we.Input {
-		fmt.Printf("%v %v %v %v %s\n", we.Input[index].ByteCount, we.Input[index].LineCount, we.Input[index].WordCount, we.Input[index].CharacterCount, we.Input[index].FileName)
-		totalByteCount += we.Input[index].ByteCount
-		totalLineCount += we.Input[index].LineCount
+	for _, input := range we.Input {
+		fmt.Printf("%d %d %d %d %s\n", input.ByteCount, input.LineCount, input.WordCount, input.CharacterCount, input.FileName)
+		totalByteCount += input.ByteCount
+		totalLineCount += input.LineCount
+		totalWordCount += input.WordCount
+		totalCharacterCount += input.CharacterCount
 	}
 
-	if totalByteCount > we.Input[0].ByteCount {
-		fmt.Printf("%v %v Total\n", totalByteCount, totalLineCount)
+	if len(we.Input) > 1 {
+		fmt.Printf("%d %d %d %d Total\n", totalByteCount, totalLineCount, totalWordCount, totalCharacterCount)
 	}
-
 }
